@@ -718,7 +718,7 @@ def main():
                 paper_bgcolor='#ffffff',
                 font={'color': '#666666', 'size': 13},
                 xaxis=dict(range=[0, 80], tickfont={'color': '#666666', 'size': 12}, title={'font': {'color': '#666666'}}, showgrid=True, gridcolor='#e2e8f0'),
-                yaxis=dict(tickfont={'color': '#666666', 'size': 12}, showgrid=True, gridcolor='#e2e8f0'),
+                yaxis=dict(tickfont={'color': '#666666', 'size': 12}, title={'text': ''}, showgrid=True, gridcolor='#e2e8f0'),
                 height=350,
                 margin=dict(l=20, r=20, t=50, b=20),
                 shapes=[{'type': 'rect', 'xref': 'paper', 'yref': 'paper', 'x0': 0, 'y0': 0, 'x1': 1, 'y1': 1, 'line': {'color': '#e2e8f0', 'width': 1}}]
