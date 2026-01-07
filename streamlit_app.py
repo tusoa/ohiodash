@@ -949,7 +949,7 @@ def main():
         
         fig_norms = create_prevalence_chart(
             filtered_df, NORMS_VARS,
-            '% Believing Peers Engage in Behavior (At Least Once)',
+            '% Believing Peers Engaged in Behavior (At least once)',
             color=COLORS['neutral'],
             is_binary=False
         )
