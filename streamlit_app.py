@@ -643,8 +643,8 @@ def main():
         
         with col2:
             # Gender
-            if 'gender' in filtered_df.columns:
-                gender_dist = filtered_df['gender'].value_counts()
+            if 'gender_label' in filtered_df.columns:
+                gender_dist = filtered_df['gender_label'].value_counts()
                 gender_pct = (gender_dist / gender_dist.sum() * 100)
                 fig_gender = px.bar(
                     x=gender_pct.index,
