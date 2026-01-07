@@ -576,6 +576,7 @@ def main():
     # ==========================================================================
     # MAIN CONTENT - TABS
     # ==========================================================================
+    st.title("Collegiate Risky Road Use Survey")
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Demographics", "Risky Driving", "Danger Perceptions", 
         "Enforcement", "Peer Norms", "Micromobility"
