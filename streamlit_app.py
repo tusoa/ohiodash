@@ -536,7 +536,7 @@ def main():
     # SIDEBAR FILTERS
     # ==========================================================================
     with st.sidebar:
-        st.title("Ohio Traffic Safety")
+        st.title("Fall 2025 Sample")
         st.markdown("### Filters")
         
         # Age filter
