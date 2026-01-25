@@ -1,3 +1,15 @@
+"""
+Ohio Traffic Safety Survey Dashboard
+=====================================
+A Streamlit dashboard for exploring traffic safety survey data from Ohio.
+Supports cross-sectional/longitudinal data with wave filtering.
+
+To run:
+1. Install requirements: pip install streamlit pandas plotly
+2. Place your data file (ohiodash.csv) in the same directory
+3. Run: streamlit run ohio_survey_dashboard_v2.py
+"""
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -205,15 +217,77 @@ NORMS_VARS = {
     'normsbelt': 'Driving without seatbelt'
 }
 
-# Response orders
+# Behavior Comparison tab variable mappings
+BEHAVIOR_COMPARISON_VARS = {
+    'alcohol': {
+        'label': 'Driving within 2 hrs of 3+ drinks',
+        'prevalence': 'alcoholbin',
+        'danger': 'dangeralc',
+        'enforcement': 'legalalc',
+        'norms': 'normsalc'
+    },
+    'text': {
+        'label': 'Texting/manually using phone while driving',
+        'prevalence': 'textbin',
+        'danger': 'dangertext',
+        'enforcement': 'legaltext',
+        'norms': 'normstext'
+    },
+    'drowsy': {
+        'label': 'Driving after less than 5 hrs sleep',
+        'prevalence': 'drowsybin',
+        'danger': 'dangerdrowsy',
+        'enforcement': 'legaldrowsy',
+        'norms': 'normsdrowsy'
+    },
+    'speed': {
+        'label': 'Driving 10+ mph over speed limit',
+        'prevalence': 'speedbin',
+        'danger': 'dangerspeed',
+        'enforcement': 'legalspeed',
+        'norms': 'normsspeed'
+    },
+    'cann5': {
+        'label': 'Driving within 5 hrs of smoking cannabis',
+        'prevalence': 'cann5bin',
+        'danger': 'dangercann5',
+        'enforcement': 'legalcann5',
+        'norms': 'normscann5'
+    },
+    'cann9': {
+        'label': 'Driving within 9 hrs of ingesting cannabis',
+        'prevalence': 'cann9bin',
+        'danger': 'dangercann9',
+        'enforcement': 'legalcann9',
+        'norms': 'normscann9'
+    },
+    'sim': {
+        'label': 'Driving within 2 hrs of alcohol + cannabis',
+        'prevalence': 'simbin',
+        'danger': 'dangersim',
+        'enforcement': 'legalsim',
+        'norms': 'normssim'
+    },
+    'rx': {
+        'label': 'Driving while feeling effects of Rx/drugs',
+        'prevalence': 'rxbin',
+        'danger': 'dangerrx',
+        'enforcement': 'legalrx',
+        'norms': 'normsrx'
+    },
+    'seatbelt': {
+        'label': 'Driving without seatbelt',
+        'prevalence': 'seatbeltbin',
+        'danger': 'dangerseatbelt',
+        'enforcement': 'legalseatbelt',
+        'norms': 'normsbelt'
+    }
+}
+
+# Response orders - display order (strongest response first)
 DANGER_ORDER = ['Very dangerous', 'Somewhat dangerous', 'Unsure', 'Somewhat safe', 'Very safe', 'Prefer not to answer']
 LIKELIHOOD_ORDER = ['Very likely', 'Somewhat likely', 'Unsure', 'Somewhat unlikely', 'Very unlikely', 'Prefer not to answer']
 FREQUENCY_ORDER = ['Never', 'Once', 'Twice', 'More than twice', 'Prefer not to answer']
-
-# Driving for income categories
-INCOME_DRIVING_ORDER = ['No', 'Yes, for delivery (e.g., Amazon Flex,..', 
-                        'Yes, for rideshare (e.g., Uber, Lyft)', 
-                        'Yes, other type of paid driving', 'Prefer not to answer']
 
 # =============================================================================
 # DATA LOADING
@@ -222,7 +296,7 @@ INCOME_DRIVING_ORDER = ['No', 'Yes, for delivery (e.g., Amazon Flex,..',
 def load_data():
     """Load and prepare the survey data."""
     try:
-        df = pd.read_csv('ohiodash.csv')
+        df = pd.read_csv('ohiodash.csv', keep_default_na=False, na_values=[''])
         return df
     except FileNotFoundError:
         st.error("Data file 'ohiodash.csv' not found. Please ensure it's in the same directory as this script.")
@@ -239,6 +313,16 @@ def calculate_prevalence_binary(df, var):
     if len(valid) == 0:
         return None
     return (valid.sum() / len(valid)) * 100
+
+def calculate_prevalence_categorical(df, var):
+    """Calculate prevalence for categorical frequency variables (% who did at least once)."""
+    if var not in df.columns:
+        return None
+    valid = df[var].dropna()
+    if len(valid) == 0:
+        return None
+    # Count anyone who didn't answer "Never"
+    return ((valid != 'Never').sum() / len(valid)) * 100
 
 def calculate_distribution(df, var, order=None):
     """Calculate distribution of categorical variable."""
@@ -270,15 +354,7 @@ def create_prevalence_chart(df, var_dict, title, color=None, is_binary=True):
         if is_binary:
             prev = calculate_prevalence_binary(df, var)
         else:
-            # For non-binary, calculate % who did at least once
-            if var in df.columns:
-                valid = df[var].dropna()
-                if len(valid) > 0:
-                    prev = (valid[valid != 'Never'].count() / len(valid)) * 100
-                else:
-                    prev = None
-            else:
-                prev = None
+            prev = calculate_prevalence_categorical(df, var)
         if prev is not None:
             data.append({'Behavior': label, 'Prevalence': prev})
     
@@ -377,11 +453,7 @@ def create_crosstab_chart(df, behavior_var, demo_var, demo_label, behavior_label
         if is_binary:
             prev = calculate_prevalence_binary(subset, behavior_var)
         else:
-            valid = subset[behavior_var].dropna()
-            if len(valid) > 0:
-                prev = (valid[valid != 'Never'].count() / len(valid)) * 100
-            else:
-                prev = None
+            prev = calculate_prevalence_categorical(subset, behavior_var)
         if prev is not None:
             data.append({'Group': str(group), 'Prevalence': prev, 'N': len(subset)})
     
@@ -460,11 +532,12 @@ def create_stacked_perception_chart(df, var_dict, title, order, colors):
     
     chart_df = pd.DataFrame(data)
     
+    # Display order - strongest response first (Dangerous/Likely)
     if is_danger:
-        response_order = ['Safe', 'Unsure', 'Dangerous']
+        response_order = ['Dangerous', 'Unsure', 'Safe']
         color_map = {'Dangerous': COLORS['warm'], 'Unsure': COLORS['neutral'], 'Safe': COLORS['primary']}
     else:
-        response_order = ['Unlikely', 'Unsure', 'Likely']
+        response_order = ['Likely', 'Unsure', 'Unlikely']
         color_map = {'Likely': COLORS['warm'], 'Unsure': COLORS['neutral'], 'Unlikely': COLORS['primary']}
     
     chart_df['Response'] = pd.Categorical(chart_df['Response'], categories=response_order, ordered=True)
@@ -511,6 +584,90 @@ def create_stacked_perception_chart(df, var_dict, title, order, colors):
     
     return fig
 
+def create_behavior_comparison_chart(df, behavior_key, behavior_vars):
+    """Create a horizontal bar chart showing 4 aggregate measures for a single behavior."""
+    vars_info = behavior_vars[behavior_key]
+    label = vars_info['label']
+    
+    data = []
+    
+    # 1. Prevalence (% who did behavior at least once) - binary variable
+    prev = calculate_prevalence_binary(df, vars_info['prevalence'])
+    if prev is not None:
+        data.append({'Measure': 'Prevalence', 'Percentage': prev, 'Order': 1})
+    
+    # 2. Enforcement (% rating as somewhat or very likely) - categorical text
+    enforce_var = vars_info['enforcement']
+    if enforce_var in df.columns:
+        enforce_counts = df[enforce_var].value_counts()
+        total = enforce_counts.sum()
+        if 'Prefer not to answer' in enforce_counts.index:
+            total = total - enforce_counts.get('Prefer not to answer', 0)
+        if total > 0:
+            likely = enforce_counts.get('Very likely', 0) + enforce_counts.get('Somewhat likely', 0)
+            data.append({'Measure': 'Enforcement Risk', 'Percentage': (likely / total) * 100, 'Order': 2})
+    
+    # 3. Danger (% rating as somewhat or very dangerous) - categorical text
+    danger_var = vars_info['danger']
+    if danger_var in df.columns:
+        danger_counts = df[danger_var].value_counts()
+        total = danger_counts.sum()
+        if 'Prefer not to answer' in danger_counts.index:
+            total = total - danger_counts.get('Prefer not to answer', 0)
+        if total > 0:
+            dangerous = danger_counts.get('Very dangerous', 0) + danger_counts.get('Somewhat dangerous', 0)
+            data.append({'Measure': 'Danger', 'Percentage': (dangerous / total) * 100, 'Order': 3})
+    
+    # 4. Norms (% believing peers engage at least once) - categorical frequency
+    norms = calculate_prevalence_categorical(df, vars_info['norms'])
+    if norms is not None:
+        data.append({'Measure': 'Norms', 'Percentage': norms, 'Order': 4})
+    
+    if not data:
+        return None
+    
+    chart_df = pd.DataFrame(data).sort_values('Order', ascending=False)  # Reverse for horizontal bar display
+    n = len(df)
+    
+    # Different color for each measure
+    color_map = {
+        'Prevalence': COLORS['primary'],       # Teal
+        'Enforcement Risk': COLORS['accent'],  # Gold
+        'Danger': COLORS['secondary'],         # Burgundy
+        'Norms': COLORS['neutral']             # Gray
+    }
+    
+    fig = px.bar(
+        chart_df,
+        x='Percentage',
+        y='Measure',
+        orientation='h',
+        text=chart_df['Percentage'].apply(lambda x: f'{x:.1f}%'),
+        color='Measure',
+        color_discrete_map=color_map
+    )
+    
+    fig.update_traces(textposition='outside', showlegend=False, textfont=dict(color='#000000', size=12))
+    fig.update_layout(
+        plot_bgcolor='#ffffff',
+        paper_bgcolor='#ffffff',
+        font={'color': '#666666', 'size': 13},
+        title={'text': f'{label} (N={n})', 'font': {'size': 16, 'color': '#666666'}},
+        xaxis_title='Percentage',
+        yaxis_title='',
+        xaxis=dict(range=[0, 100], tickfont={'color': '#666666', 'size': 12}, title={'font': {'color': '#666666'}}, showgrid=True, gridcolor='#e2e8f0'),
+        yaxis=dict(tickfont={'color': '#666666', 'size': 12}, showgrid=True, gridcolor='#e2e8f0', categoryorder='array', categoryarray=['Norms', 'Danger', 'Enforcement Risk', 'Prevalence']),
+        height=300,
+        margin=dict(l=20, r=20, t=50, b=20),
+        shapes=[{
+            'type': 'rect', 'xref': 'paper', 'yref': 'paper',
+            'x0': 0, 'y0': 0, 'x1': 1, 'y1': 1,
+            'line': {'color': '#e2e8f0', 'width': 1}
+        }]
+    )
+    
+    return fig
+
 # =============================================================================
 # MAIN APP
 # =============================================================================
@@ -536,7 +693,7 @@ def main():
     # SIDEBAR FILTERS
     # ==========================================================================
     with st.sidebar:
-        st.title("Fall 2025 Sample")
+        st.title("Ohio Traffic Safety")
         st.markdown("### Filters")
         
         # Age filter
@@ -577,9 +734,9 @@ def main():
     # MAIN CONTENT - TABS
     # ==========================================================================
     st.title("Collegiate Risky Road Use Survey")
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "Demographics", "Risky Driving", "Danger Perceptions", 
-        "Enforcement", "Peer Norms", "Micromobility"
+        "Enforcement", "Peer Norms", "Micromobility", "Behavior Comparison"
     ])
     
     # =========================================================================
@@ -620,12 +777,14 @@ def main():
             # City
             if 'city' in filtered_df.columns:
                 city_dist = filtered_df['city'].value_counts()
-                city_pct = (city_dist / city_dist.sum() * 100)
+                city_pct = (city_dist / city_dist.sum() * 100).sort_values(ascending=True)
+                city_df = pd.DataFrame({'City': city_pct.index, 'Percentage': city_pct.values})
                 fig_city = px.bar(
-                    x=city_pct.index,
-                    y=city_pct.values,
-                    labels={'x': 'City', 'y': 'Percentage'},
-                    text=city_pct.apply(lambda x: f'{x:.1f}%'),
+                    city_df,
+                    x='Percentage',
+                    y='City',
+                    orientation='h',
+                    text=city_df['Percentage'].apply(lambda x: f'{x:.1f}%'),
                     color_discrete_sequence=[COLORS['primary']]
                 )
                 fig_city.update_traces(textposition='outside', textfont_color='#000000')
@@ -634,10 +793,10 @@ def main():
                     plot_bgcolor='#ffffff',
                     paper_bgcolor='#ffffff',
                     font={'color': '#666666', 'size': 13},
-                    xaxis=dict(tickfont={'color': '#666666', 'size': 10}, title={'text': ''}, tickangle=-45, showgrid=True, gridcolor='#e2e8f0'),
-                    yaxis=dict(tickfont={'color': '#666666', 'size': 12}, title={'font': {'color': '#666666'}}, range=[0, max(city_pct.values) * 1.2], showgrid=True, gridcolor='#e2e8f0'),
-                    height=400,
-                    margin=dict(l=20, r=20, t=50, b=120),
+                    xaxis=dict(range=[0, 55], tickfont={'color': '#666666', 'size': 12}, title={'font': {'color': '#666666'}}, showgrid=True, gridcolor='#e2e8f0'),
+                    yaxis=dict(tickfont={'color': '#666666', 'size': 12}, showgrid=True, gridcolor='#e2e8f0'),
+                    height=300,
+                    margin=dict(l=20, r=20, t=50, b=20),
                     shapes=[{'type': 'rect', 'xref': 'paper', 'yref': 'paper', 'x0': 0, 'y0': 0, 'x1': 1, 'y1': 1, 'line': {'color': '#e2e8f0', 'width': 1}}]
                 )
                 st.plotly_chart(fig_city, use_container_width=True)
@@ -1069,6 +1228,52 @@ def main():
                 shapes=[{'type': 'rect', 'xref': 'paper', 'yref': 'paper', 'x0': 0, 'y0': 0, 'x1': 1, 'y1': 1, 'line': {'color': '#e2e8f0', 'width': 1}}]
             )
             st.plotly_chart(fig_neg, use_container_width=True)
+    
+    # =========================================================================
+    # TAB 7: BEHAVIOR COMPARISON
+    # =========================================================================
+    with tab7:
+        st.header("Behavior Comparison")
+        st.markdown(f"**{len(filtered_df)} respondents** | *Compare aggregate measures across behaviors*")
+        st.markdown("Select a behavior to see its prevalence, enforcement risk perception, danger perception, and peer norms side-by-side.")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Behavior 1")
+            selected_behavior_1 = st.selectbox(
+                "Select behavior:",
+                options=list(BEHAVIOR_COMPARISON_VARS.keys()),
+                format_func=lambda x: BEHAVIOR_COMPARISON_VARS[x]['label'],
+                key='compare_behavior_1'
+            )
+            
+            fig1 = create_behavior_comparison_chart(filtered_df, selected_behavior_1, BEHAVIOR_COMPARISON_VARS)
+            if fig1:
+                st.plotly_chart(fig1, use_container_width=True)
+        
+        with col2:
+            st.subheader("Behavior 2")
+            selected_behavior_2 = st.selectbox(
+                "Select behavior:",
+                options=list(BEHAVIOR_COMPARISON_VARS.keys()),
+                format_func=lambda x: BEHAVIOR_COMPARISON_VARS[x]['label'],
+                key='compare_behavior_2',
+                index=1  # Default to second option
+            )
+            
+            fig2 = create_behavior_comparison_chart(filtered_df, selected_behavior_2, BEHAVIOR_COMPARISON_VARS)
+            if fig2:
+                st.plotly_chart(fig2, use_container_width=True)
+        
+        st.markdown("---")
+        st.markdown("""
+        **Measure definitions:**
+        - **Prevalence**: % who engaged in the behavior at least once (past 30 days)
+        - **Enforcement Risk**: % who rated being pulled over as "Somewhat likely" or "Very likely"
+        - **Danger**: % who rated the behavior as "Somewhat dangerous" or "Very dangerous"
+        - **Norms**: % who believe their peers engage in the behavior at least once
+        """)
 
 if __name__ == "__main__":
     main()
