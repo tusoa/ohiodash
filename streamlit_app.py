@@ -585,7 +585,18 @@ def create_stacked_perception_chart(df, var_dict, title, order, colors):
     return fig
 
 def create_behavior_comparison_chart(df, behavior_key, behavior_vars):
-    """Create a horizontal bar chart showing 4 aggregate measures for a single behavior."""
+    """Create a horizontal bar chart showing 4 aggregate measures for a single behavior.
+    Chart is restricted to respondents who reported driving.
+    """
+    
+    # Restrict to drivers only
+    if 'drivebin' in df.columns:
+        df = df[df['drivebin'] == 1]
+    
+    # Exit early if no drivers
+    if df.empty:
+        return None
+        
     vars_info = behavior_vars[behavior_key]
     label = vars_info['label']
     
@@ -1234,46 +1245,55 @@ def main():
     # =========================================================================
     with tab7:
         st.header("Behavior Comparison")
-        st.markdown(f"**{len(filtered_df)} respondents** | *Compare aggregate measures across behaviors*")
-        st.markdown("Select a behavior to see its prevalence, enforcement risk perception, danger perception, and peer norms side-by-side.")
         
-        col1, col2 = st.columns(2)
+        drivers_df = filtered_df[filtered_df['drivebin'] == 1] if 'drivebin' in filtered_df.columns else filtered_df
+        st.markdown(f"**{len(drivers_df)} drivers** based on current filters")
         
-        with col1:
-            st.subheader("Behavior 1")
-            selected_behavior_1 = st.selectbox(
-                "Select behavior:",
-                options=list(BEHAVIOR_COMPARISON_VARS.keys()),
-                format_func=lambda x: BEHAVIOR_COMPARISON_VARS[x]['label'],
-                key='compare_behavior_1'
+        if len(drivers_df) == 0:
+            st.warning("No drivers in the current filter selection.")
+        else:
+            st.markdown(
+                "Compare prevalence, perceived danger, enforcement risk, and peer norms "
+                "across driving-related behaviors."
             )
             
-            fig1 = create_behavior_comparison_chart(filtered_df, selected_behavior_1, BEHAVIOR_COMPARISON_VARS)
-            if fig1:
-                st.plotly_chart(fig1, use_container_width=True)
-        
-        with col2:
-            st.subheader("Behavior 2")
-            selected_behavior_2 = st.selectbox(
-                "Select behavior:",
-                options=list(BEHAVIOR_COMPARISON_VARS.keys()),
-                format_func=lambda x: BEHAVIOR_COMPARISON_VARS[x]['label'],
-                key='compare_behavior_2',
-                index=1  # Default to second option
-            )
+            col1, col2 = st.columns(2)
             
-            fig2 = create_behavior_comparison_chart(filtered_df, selected_behavior_2, BEHAVIOR_COMPARISON_VARS)
-            if fig2:
-                st.plotly_chart(fig2, use_container_width=True)
-        
-        st.markdown("---")
-        st.markdown("""
-        **Measure definitions:**
-        - **Prevalence**: % who engaged in the behavior at least once (past 30 days)
-        - **Enforcement Risk**: % who rated being pulled over as "Somewhat likely" or "Very likely"
-        - **Danger**: % who rated the behavior as "Somewhat dangerous" or "Very dangerous"
-        - **Norms**: % who believe their peers engage in the behavior at least once
-        """)
+            with col1:
+                st.subheader("Behavior 1")
+                selected_behavior_1 = st.selectbox(
+                    "Select behavior:",
+                    options=list(BEHAVIOR_COMPARISON_VARS.keys()),
+                    format_func=lambda x: BEHAVIOR_COMPARISON_VARS[x]['label'],
+                    key='compare_behavior_1'
+                )
+                
+                fig1 = create_behavior_comparison_chart(filtered_df, selected_behavior_1, BEHAVIOR_COMPARISON_VARS)
+                if fig1:
+                    st.plotly_chart(fig1, use_container_width=True)
+            
+            with col2:
+                st.subheader("Behavior 2")
+                selected_behavior_2 = st.selectbox(
+                    "Select behavior:",
+                    options=list(BEHAVIOR_COMPARISON_VARS.keys()),
+                    format_func=lambda x: BEHAVIOR_COMPARISON_VARS[x]['label'],
+                    key='compare_behavior_2',
+                    index=1  # Default to second option
+                )
+                
+                fig2 = create_behavior_comparison_chart(filtered_df, selected_behavior_2, BEHAVIOR_COMPARISON_VARS)
+                if fig2:
+                    st.plotly_chart(fig2, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("""
+            **Measure definitions:**
+            - **Prevalence**: % who engaged in the behavior at least once (past 30 days)
+            - **Enforcement Risk**: % who rated being pulled over as "Somewhat likely" or "Very likely"
+            - **Danger**: % who rated the behavior as "Somewhat dangerous" or "Very dangerous"
+            - **Norms**: % who believe their peers engage in the behavior at least once
+            """)
 
 if __name__ == "__main__":
     main()
